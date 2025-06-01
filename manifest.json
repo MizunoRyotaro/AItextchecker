@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "AI文章チェッカー",
+  "version": "1.0",
+  "description": "誤字脱字をAIで自動チェックして修正版を提供します",
+  
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "scripting",
+    "activeTab",
+    "tabs"
+  ],
+  
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end",
+      "all_frames": true,
+      "match_about_blank": true
+    }
+  ],
+  
+  "background": {
+    "service_worker": "background.js"
+  },
+  
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AI文章チェッカー設定"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "styles.css"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+} 
