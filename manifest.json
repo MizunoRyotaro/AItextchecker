@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI文章チェッカー",
-  "version": "1.0",
-  "description": "誤字脱字をAIで自動チェックして修正版を提供します",
+  "name": "AI文章チェッカー & Midjourneyプロンプト変換",
+  "version": "2.0",
+  "description": "誤字脱字チェックとMidjourneyプロンプト変換を行うAI支援ツール。英語学習機能付き。",
   
   "permissions": [
     "storage",
@@ -33,7 +33,7 @@
   
   "action": {
     "default_popup": "popup.html",
-    "default_title": "AI文章チェッカー設定"
+    "default_title": "AI文章チェッカー & プロンプト変換"
   },
   
   "web_accessible_resources": [

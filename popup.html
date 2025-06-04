@@ -3,14 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI文章チェッカー設定</title>
+  <title>AI文章チェッカー & プロンプト変換</title>
   <style>
     body {
-      width: 350px;
+      width: 380px;
+      max-height: 600px;
       padding: 16px;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
       background-color: #f8f9fa;
+      overflow-y: auto;
+      box-sizing: border-box;
     }
     
     .header {
@@ -30,6 +33,44 @@
       font-size: 12px;
       color: #6c757d;
       margin-top: 4px;
+    }
+
+    .mode-selector {
+      margin-bottom: 20px;
+      background: white;
+      padding: 16px;
+      border-radius: 6px;
+      border: 1px solid #e9ecef;
+    }
+
+    .mode-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .mode-tab {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ced4da;
+      background: #f8f9fa;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+
+    .mode-tab.active {
+      background: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
+
+    .mode-description {
+      font-size: 12px;
+      color: #6c757d;
+      line-height: 1.4;
     }
     
     .setting-group {
@@ -178,19 +219,41 @@
       font-weight: 600;
       color: #495057;
     }
+
+    .mode-setting {
+      display: none;
+    }
+
+    .mode-setting.active {
+      display: block;
+    }
   </style>
 </head>
 <body>
   <div class="header">
-    <h1>🤖 AI文章チェッカー</h1>
-    <div class="version">v1.0</div>
+    <h1>🤖 AI文章チェッカー & プロンプト変換</h1>
+    <div class="version">v2.0</div>
+  </div>
+
+  <div class="mode-selector">
+    <div class="mode-tabs">
+      <div class="mode-tab active" data-mode="text-check">
+        📝 誤字脱字チェック
+      </div>
+      <div class="mode-tab" data-mode="prompt-convert">
+        🎨 Midjourneyプロンプト
+      </div>
+    </div>
+    <div class="mode-description" id="modeDescription">
+      日本語文章の誤字脱字や表現をAIがチェックします
+    </div>
   </div>
 
   <div class="setting-group">
     <div class="toggle-container">
       <div>
         <div class="setting-label">機能を有効化</div>
-        <div class="setting-description">全サイトでAIチェック機能を使用</div>
+        <div class="setting-description">全サイトでAI機能を使用</div>
       </div>
       <div class="toggle" id="enabledToggle">
         <div class="toggle-slider"></div>
@@ -210,21 +273,61 @@
     </div>
   </div>
 
-  <div class="setting-group">
-    <label class="setting-label" for="minLength">最小チェック文字数</label>
-    <input type="number" id="minLength" class="setting-input" min="10" max="1000" value="20">
-    <div class="setting-description">この文字数以上でAIチェックを開始</div>
+  <!-- 文章チェック用設定 -->
+  <div class="mode-setting active" id="textCheckSettings">
+    <div class="setting-group">
+      <label class="setting-label" for="minLength">最小チェック文字数</label>
+      <input type="number" id="minLength" class="setting-input" min="10" max="1000" value="20">
+      <div class="setting-description">この文字数以上でAIチェックを開始</div>
+    </div>
   </div>
 
+  <!-- プロンプト変換用設定 -->
+  <div class="mode-setting" id="promptSettings">
+    <div class="setting-group">
+      <div class="toggle-container">
+        <div>
+          <div class="setting-label">英語学習機能</div>
+          <div class="setting-description">変換結果に英語解説を追加</div>
+        </div>
+        <div class="toggle" id="learningToggle">
+          <div class="toggle-slider"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label" for="promptStyle">プロンプトスタイル</label>
+      <select id="promptStyle" class="setting-input">
+        <option value="none">なし（単純な英訳のみ）</option>
+        <option value="detailed">詳細・リアル</option>
+        <option value="artistic">芸術的・抽象的</option>
+        <option value="anime">アニメ・イラスト</option>
+        <option value="photography">写真風</option>
+        <option value="minimalist">ミニマル</option>
+      </select>
+      <div class="setting-description">Midjourneyプロンプトの出力スタイル</div>
+    </div>
+
+    <div class="setting-group">
+      <label class="setting-label" for="promptLength">プロンプト長さ</label>
+      <select id="promptLength" class="setting-input">
+        <option value="short">短め（簡潔）</option>
+        <option value="medium">中程度</option>
+        <option value="long">長め（詳細）</option>
+      </select>
+      <div class="setting-description">生成されるプロンプトの詳細度</div>
+    </div>
+  </div>
 
   <button class="save-button" id="saveButton">設定を保存</button>
   
   <div class="status-message" id="statusMessage"></div>
 
   <div class="stats">
-    <div class="stats-item">今日のチェック回数: <span class="stats-value" id="todayChecks">0</span></div>
-    <div class="stats-item">累計チェック回数: <span class="stats-value" id="totalChecks">0</span></div>
-    <div class="stats-item">発見した問題数: <span class="stats-value" id="totalIssues">0</span></div>
+    <div class="stats-item">今日の使用回数: <span class="stats-value" id="todayChecks">0</span></div>
+    <div class="stats-item">累計使用回数: <span class="stats-value" id="totalChecks">0</span></div>
+    <div class="stats-item">解決した問題数: <span class="stats-value" id="totalIssues">0</span></div>
   </div>
 
   <script src="popup.js"></script>

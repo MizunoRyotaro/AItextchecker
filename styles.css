@@ -375,4 +375,403 @@
 
 .ai-checker-modal-body::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* AI文章チェッカー & プロンプト変換 - スタイルシート */
+
+/* インジケーター */
+.ai-text-checker-indicator {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e9ecef;
+  z-index: 10000;
+  max-width: 450px;
+  min-width: 300px;
+  max-height: calc(100vh - 40px);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  animation: slideInFromRight 0.3s ease-out;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.ai-text-checker-indicator.converting {
+  border-left: 4px solid #8b5cf6;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.ai-text-checker-indicator.checking {
+  border-left: 4px solid #06b6d4;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.ai-text-checker-indicator.result {
+  border-left: 4px solid #10b981;
+}
+
+.ai-text-checker-indicator.prompt-result {
+  border-left: 4px solid #f59e0b;
+}
+
+.ai-text-checker-indicator.error {
+  border-left: 4px solid #ef4444;
+  max-height: 200px;
+}
+
+.indicator-content {
+  padding: 16px;
+}
+
+.indicator-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.indicator-title {
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.close-button:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.indicator-text {
+  display: inline-block;
+  font-size: 14px;
+  color: #374151;
+}
+
+/* プロンプト変換結果 */
+.prompt-section {
+  margin-bottom: 16px;
+}
+
+.prompt-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.prompt-text {
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1f2937;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-bottom: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.prompt-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* クリエイティブ提案セクション */
+.creative-section {
+  margin-bottom: 16px;
+  background: #f0fdf4;
+  border: 1px solid #16a34a;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.creative-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #15803d;
+}
+
+.creative-text {
+  background: #dcfce7;
+  border: 1px solid #4ade80;
+  border-radius: 6px;
+  padding: 12px;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #14532d;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-bottom: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.creative-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.copy-button, .midjourney-button, .copy-creative-button {
+  background: #3b82f6;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.copy-button:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+.copy-creative-button {
+  background: #16a34a;
+}
+
+.copy-creative-button:hover {
+  background: #15803d;
+  transform: translateY(-1px);
+}
+
+.midjourney-button {
+  background: #f59e0b;
+}
+
+.midjourney-button:hover {
+  background: #d97706;
+  transform: translateY(-1px);
+}
+
+/* 英語学習セクション */
+.learning-section {
+  margin-bottom: 16px;
+  background: #fef3c7;
+  border: 1px solid #fbbf24;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.learning-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.learning-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #78350f;
+  max-height: 200px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.learning-content strong {
+  color: #92400e;
+  font-weight: 600;
+  display: block;
+  margin-top: 12px;
+  margin-bottom: 4px;
+  font-size: 14px;
+}
+
+.learning-content ul {
+  margin: 8px 0;
+  padding-left: 16px;
+}
+
+.learning-content li {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+.learning-content br {
+  margin: 4px 0;
+}
+
+/* 英語学習セクション内の特殊スタイル */
+.learning-content li strong {
+  display: inline;
+  margin: 0;
+  font-size: inherit;
+  color: #a16207;
+}
+
+/* オリジナルテキストセクション */
+.original-section {
+  margin-bottom: 8px;
+}
+
+.original-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.original-text {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #6b7280;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .ai-text-checker-indicator {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: none;
+    min-width: auto;
+    max-height: calc(100vh - 20px);
+  }
+  
+  .prompt-actions, .creative-actions {
+    flex-direction: column;
+  }
+  
+  .copy-button, .midjourney-button, .copy-creative-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .ai-text-checker-indicator {
+    top: 5px;
+    right: 5px;
+    left: 5px;
+    max-height: calc(100vh - 10px);
+  }
+  
+  .indicator-content {
+    padding: 12px;
+  }
+  
+  .prompt-text, .creative-text {
+    max-height: 120px;
+  }
+  
+  .learning-content {
+    max-height: 150px;
+  }
+}
+
+/* スクロールバーのスタイル */
+.ai-text-checker-indicator::-webkit-scrollbar,
+.prompt-text::-webkit-scrollbar,
+.creative-text::-webkit-scrollbar,
+.learning-content::-webkit-scrollbar,
+.original-text::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-text-checker-indicator::-webkit-scrollbar-track,
+.prompt-text::-webkit-scrollbar-track,
+.creative-text::-webkit-scrollbar-track,
+.learning-content::-webkit-scrollbar-track,
+.original-text::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.ai-text-checker-indicator::-webkit-scrollbar-thumb,
+.prompt-text::-webkit-scrollbar-thumb,
+.creative-text::-webkit-scrollbar-thumb,
+.learning-content::-webkit-scrollbar-thumb,
+.original-text::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.ai-text-checker-indicator::-webkit-scrollbar-thumb:hover,
+.prompt-text::-webkit-scrollbar-thumb:hover,
+.creative-text::-webkit-scrollbar-thumb:hover,
+.learning-content::-webkit-scrollbar-thumb:hover,
+.original-text::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* アニメーション */
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 } 

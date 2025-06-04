@@ -1,4 +1,4 @@
-// AI文章チェッカー - バックグラウンドサービスワーカー
+// AI文章チェッカー & プロンプト変換 - バックグラウンドサービスワーカー
 class BackgroundService {
   constructor() {
     this.init();
@@ -55,22 +55,42 @@ class BackgroundService {
         });
       });
 
-      const settings = await this.getStorageData(['enabled']);
+      const settings = await this.getStorageData(['enabled', 'mode']);
       
       if (settings.enabled !== false) {
-        chrome.contextMenus.create({
-          id: 'aiTextChecker',
-          title: '🔍 誤字脱字をチェック',
-          contexts: ['selection'],
-          documentUrlPatterns: ['http://*/*', 'https://*/*'],
-          targetUrlPatterns: ['http://*/*', 'https://*/*']
-        }, () => {
-          if (chrome.runtime.lastError) {
-            console.error('Context menu creation error:', chrome.runtime.lastError.message);
-          } else {
-            console.log('Context menu created successfully');
-          }
-        });
+        const currentMode = settings.mode || 'text-check';
+        
+        if (currentMode === 'text-check') {
+          // 誤字脱字チェック用メニュー
+          chrome.contextMenus.create({
+            id: 'aiTextChecker',
+            title: '🔍 誤字脱字をチェック',
+            contexts: ['selection'],
+            documentUrlPatterns: ['http://*/*', 'https://*/*'],
+            targetUrlPatterns: ['http://*/*', 'https://*/*']
+          }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('Context menu creation error:', chrome.runtime.lastError.message);
+            } else {
+              console.log('Text checker context menu created successfully');
+            }
+          });
+        } else if (currentMode === 'prompt-convert') {
+          // Midjourneyプロンプト変換用メニュー
+          chrome.contextMenus.create({
+            id: 'midjourneyPrompt',
+            title: '🎨 MidjourneyWEBプロンプトに変換',
+            contexts: ['selection'],
+            documentUrlPatterns: ['http://*/*', 'https://*/*'],
+            targetUrlPatterns: ['http://*/*', 'https://*/*']
+          }, () => {
+            if (chrome.runtime.lastError) {
+              console.error('Context menu creation error:', chrome.runtime.lastError.message);
+            } else {
+              console.log('Midjourney prompt context menu created successfully');
+            }
+          });
+        }
       }
     } catch (error) {
       console.error('Error in createContextMenu:', error);
@@ -78,15 +98,16 @@ class BackgroundService {
   }
 
   async handleContextMenuClick(info, tab) {
-    if (info.menuItemId === 'aiTextChecker') {
+    if (info.menuItemId === 'aiTextChecker' || info.menuItemId === 'midjourneyPrompt') {
       try {
         console.log('Context menu clicked, selection info:', info.selectionText);
         
         // まず選択テキストを確認
-        if (!info.selectionText || info.selectionText.trim().length < 10) {
+        const minLength = info.menuItemId === 'midjourneyPrompt' ? 5 : 10; // プロンプト変換は短めでもOK
+        if (!info.selectionText || info.selectionText.trim().length < minLength) {
           const message = info.selectionText 
-            ? `選択されたテキストが短すぎます（${info.selectionText.trim().length}文字）。10文字以上選択してください。`
-            : '10文字以上のテキストを選択してから右クリックしてください。';
+            ? `選択されたテキストが短すぎます（${info.selectionText.trim().length}文字）。${minLength}文字以上選択してください。`
+            : `${minLength}文字以上のテキストを選択してから右クリックしてください。`;
           this.showNotification('選択エラー', message);
           return;
         }
@@ -94,24 +115,25 @@ class BackgroundService {
         // まず、コンテンツスクリプトが注入されているかチェック
         await this.ensureContentScriptInjected(tab);
 
-        // 選択テキストをコンテンツスクリプトに渡してチェック実行
+        // 選択テキストをコンテンツスクリプトに渡して処理実行
+        const action = info.menuItemId === 'aiTextChecker' ? 'checkSelectedText' : 'convertToPrompt';
         const response = await chrome.tabs.sendMessage(tab.id, {
-          action: 'checkSelectedText',
+          action: action,
           selectedText: info.selectionText.trim()
         });
 
         if (!response || !response.success) {
           // エラー時の処理
-          console.error('Text check failed:', response?.error || 'Unknown error');
-          this.showNotification('エラー', response?.error || 'AIチェックに失敗しました');
+          console.error('Processing failed:', response?.error || 'Unknown error');
+          this.showNotification('エラー', response?.error || '処理に失敗しました');
         } else {
-          console.log('Text check completed successfully');
+          console.log('Processing completed successfully');
         }
       } catch (error) {
         console.error('Context menu action failed:', error);
         
         // より具体的なエラーメッセージ
-        let errorMessage = 'AIチェックに失敗しました。';
+        let errorMessage = '処理に失敗しました。';
         if (error.message.includes('Could not establish connection')) {
           errorMessage = 'このページではご利用いただけません。通常のWebページで再試行してください。';
         } else if (error.message.includes('Extension context invalidated')) {
@@ -292,6 +314,10 @@ class BackgroundService {
       enabled: true,
       apiKey: '',
       minLength: 10,
+      mode: 'text-check',
+      learningEnabled: true,
+      promptStyle: 'detailed',
+      promptLength: 'medium',
       todayChecks: 0,
       totalChecks: 0,
       totalIssues: 0,
@@ -323,13 +349,17 @@ class BackgroundService {
           break;
 
         case 'GET_SETTINGS':
-          const settings = await this.getStorageData(['enabled', 'apiKey', 'minLength']);
+          const settings = await this.getStorageData([
+            'enabled', 'apiKey', 'minLength', 'mode', 
+            'learningEnabled', 'promptStyle', 'promptLength'
+          ]);
           sendResponse({ success: true, data: settings });
           break;
 
         case 'CHECK_TEXT':
-          // 将来的にバックグラウンドでAIチェックを実行する場合
-          const result = await this.performTextCheck(message.data);
+        case 'CONVERT_PROMPT':
+          // 将来的にバックグラウンドでAI処理を実行する場合
+          const result = await this.performAITask(message.data, message.type);
           sendResponse({ success: true, data: result });
           break;
 
@@ -356,7 +386,7 @@ class BackgroundService {
     }
 
     // 統計を更新
-    if (data.type === 'check_completed') {
+    if (data.type === 'check_completed' || data.type === 'prompt_converted') {
       todayChecks++;
       totalChecks++;
       
@@ -395,11 +425,12 @@ class BackgroundService {
   async handleStorageChange(changes, namespace) {
     if (namespace === 'sync') {
       // 設定変更をコンテンツスクリプトに通知
-      if (changes.enabled || changes.apiKey || changes.minLength) {
+      if (changes.enabled || changes.apiKey || changes.minLength || changes.mode || 
+          changes.learningEnabled || changes.promptStyle || changes.promptLength) {
         this.notifyAllTabs('SETTINGS_CHANGED', changes);
         
-        // 有効/無効設定が変更された場合はコンテキストメニューを更新
-        if (changes.enabled) {
+        // 有効/無効設定やモードが変更された場合はコンテキストメニューを更新
+        if (changes.enabled || changes.mode) {
           setTimeout(() => {
             this.createContextMenu();
           }, 100);
@@ -433,10 +464,10 @@ class BackgroundService {
     }
   }
 
-  async performTextCheck(data) {
-    // 将来的にバックグラウンドでAIチェックを実行する場合の実装
+  async performAITask(data, taskType) {
+    // 将来的にバックグラウンドでAI処理を実行する場合の実装
     // 現在はコンテンツスクリプトで直接API呼び出しを行っているため、未実装
-    throw new Error('Background text check not implemented');
+    throw new Error(`Background ${taskType} not implemented`);
   }
 
   async getStorageData(keys) {

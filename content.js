@@ -1,8 +1,12 @@
-// AI文章チェッカー - メインコンテンツスクリプト
+// AI文章チェッカー & プロンプト変換 - メインコンテンツスクリプト
 class AITextChecker {
   constructor() {
     this.isEnabled = true;
     this.minTextLength = 10; // 最小チェック文字数
+    this.mode = 'text-check'; // 'text-check' or 'prompt-convert'
+    this.learningEnabled = true;
+    this.promptStyle = 'detailed';
+    this.promptLength = 'medium';
     this.selectedText = '';
     this.lastCheckResult = null;
     this.initAttempts = 0;
@@ -13,19 +17,23 @@ class AITextChecker {
 
   async init() {
     this.initAttempts++;
-    console.log(`AI文章チェッカー初期化開始 (試行 ${this.initAttempts}/${this.maxInitAttempts})`);
+    console.log(`AI文章チェッカー & プロンプト変換初期化開始 (試行 ${this.initAttempts}/${this.maxInitAttempts})`);
     
     try {
       // 設定を読み込み
       const settings = await this.loadSettings();
       this.isEnabled = settings.enabled !== false;
       this.minTextLength = settings.minLength || 10;
+      this.mode = settings.mode || 'text-check';
+      this.learningEnabled = settings.learningEnabled !== false;
+      this.promptStyle = settings.promptStyle || 'detailed';
+      this.promptLength = settings.promptLength || 'medium';
       
       if (this.isEnabled) {
         this.setupTextSelection();
         this.setupMessageListener();
         this.injectStyles();
-        console.log('AI文章チェッカー初期化完了');
+        console.log('AI文章チェッカー & プロンプト変換初期化完了');
       }
     } catch (error) {
       console.error('初期化エラー:', error);
@@ -43,7 +51,10 @@ class AITextChecker {
 
   async loadSettings() {
     return new Promise((resolve) => {
-      chrome.storage.sync.get(['enabled', 'apiKey', 'minLength'], (result) => {
+      chrome.storage.sync.get([
+        'enabled', 'apiKey', 'minLength', 'mode', 
+        'learningEnabled', 'promptStyle', 'promptLength'
+      ], (result) => {
         resolve(result);
       });
     });
@@ -109,6 +120,24 @@ class AITextChecker {
         }
         
         this.checkSelectedText().then(result => {
+          sendResponse(result);
+        }).catch(error => {
+          sendResponse({ success: false, error: error.message });
+        });
+        return true; // 非同期レスポンスを有効化
+      }
+
+      if (request.action === 'convertToPrompt') {
+        // プロンプト変換機能
+        if (request.selectedText) {
+          console.log('Received selected text for prompt conversion:', request.selectedText);
+          this.selectedText = request.selectedText;
+        } else {
+          console.log('No text provided, checking current selection...');
+          this.handleTextSelection();
+        }
+        
+        this.convertToMidjourneyPrompt().then(result => {
           sendResponse(result);
         }).catch(error => {
           sendResponse({ success: false, error: error.message });
@@ -395,31 +424,59 @@ class AITextChecker {
     
     console.log('Positioning indicator, window type:', isPopupWindow ? 'popup' : 'normal');
     
-    const selection = window.getSelection();
-    if (selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      
+    // プロンプト結果の場合は画面右上に固定
+    if (indicator.classList.contains('prompt-result') || indicator.classList.contains('result')) {
       indicator.style.position = 'fixed';
-      indicator.style.left = Math.max(10, rect.left + rect.width / 2 - 75) + 'px';
-      indicator.style.top = Math.max(10, rect.top - 40) + 'px';
-      indicator.style.zIndex = baseZIndex.toString();
-      
-      console.log('Indicator positioned at:', indicator.style.left, indicator.style.top);
-    } else {
-      // フォールバック：画面中央に表示
-      indicator.style.position = 'fixed';
-      indicator.style.left = '50%';
       indicator.style.top = '20px';
-      indicator.style.transform = 'translateX(-50%)';
+      indicator.style.right = '20px';
+      indicator.style.left = 'auto';
       indicator.style.zIndex = baseZIndex.toString();
+      indicator.style.transform = 'none';
       
-      console.log('Indicator positioned at center');
+      // モバイル環境での調整
+      if (window.innerWidth <= 768) {
+        indicator.style.top = '10px';
+        indicator.style.right = '10px';
+        indicator.style.left = '10px';
+      }
+      
+      if (window.innerWidth <= 480) {
+        indicator.style.top = '5px';
+        indicator.style.right = '5px';
+        indicator.style.left = '5px';
+      }
+      
+      console.log('Prompt result positioned at fixed position');
+    } else {
+      // その他のインジケーター（チェック結果など）は選択位置に表示
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        
+        indicator.style.position = 'fixed';
+        indicator.style.left = Math.max(10, rect.left + rect.width / 2 - 75) + 'px';
+        indicator.style.top = Math.max(10, rect.top - 40) + 'px';
+        indicator.style.zIndex = baseZIndex.toString();
+        indicator.style.right = 'auto';
+        indicator.style.transform = 'none';
+        
+        console.log('Indicator positioned at:', indicator.style.left, indicator.style.top);
+      } else {
+        // フォールバック：画面中央上部に表示
+        indicator.style.position = 'fixed';
+        indicator.style.left = '50%';
+        indicator.style.top = '20px';
+        indicator.style.right = 'auto';
+        indicator.style.transform = 'translateX(-50%)';
+        indicator.style.zIndex = baseZIndex.toString();
+        
+        console.log('Indicator positioned at center');
+      }
     }
     
     // ポップアップウィンドウの場合は追加の調整
     if (isPopupWindow) {
-      indicator.style.backgroundColor = 'rgba(102, 126, 234, 0.95)';
       indicator.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.3)';
       indicator.style.border = '2px solid rgba(255, 255, 255, 0.3)';
     }
@@ -431,6 +488,18 @@ class AITextChecker {
     setTimeout(() => {
       const indicatorRect = indicator.getBoundingClientRect();
       console.log('Indicator position and size:', indicatorRect);
+      
+      // 画面外にはみ出している場合の調整
+      if (indicatorRect.right > window.innerWidth - 10) {
+        indicator.style.right = '10px';
+        indicator.style.left = 'auto';
+        console.log('Adjusted indicator to prevent overflow');
+      }
+      
+      if (indicatorRect.bottom > window.innerHeight - 10) {
+        indicator.style.maxHeight = (window.innerHeight - 30) + 'px';
+        console.log('Adjusted indicator height to prevent overflow');
+      }
     }, 50);
   }
 
@@ -738,6 +807,382 @@ class AITextChecker {
     
     document.head.appendChild(inlineStyles);
     console.log('Inline styles injected');
+  }
+
+  async convertToMidjourneyPrompt() {
+    // 選択テキストの最終確認
+    if (!this.selectedText) {
+      this.handleTextSelection(); // 再度選択を試行
+    }
+    
+    console.log('Converting to Midjourney prompt:', this.selectedText, 'Length:', this.selectedText?.length || 0);
+    
+    const minLength = 5; // プロンプト変換は短めでもOK
+    if (!this.selectedText || this.selectedText.length < minLength) {
+      const errorMsg = this.selectedText
+        ? `選択されたテキストが短すぎます（${this.selectedText.length}文字）。${minLength}文字以上のテキストを選択してください。`
+        : `${minLength}文字以上のテキストを選択してください`;
+      throw new Error(errorMsg);
+    }
+
+    try {
+      // 変換中のインジケーターを表示
+      this.showConvertingIndicator();
+
+      const result = await this.callGeminiForPrompt(this.selectedText);
+      
+      // 統計を更新
+      this.updateStats({ type: 'prompt_converted' });
+      
+      // 結果を表示
+      this.showPromptResult(result);
+      
+      this.lastCheckResult = result;
+      return { success: true, result };
+
+    } catch (error) {
+      console.error('Prompt Conversion Error:', error);
+      this.showErrorIndicator(error.message);
+      throw error;
+    }
+  }
+
+  async callGeminiForPrompt(text) {
+    const settings = await this.loadSettings();
+    
+    if (!settings.apiKey) {
+      throw new Error('Gemini API キーが設定されていません。拡張機能の設定で設定してください。');
+    }
+
+    const prompt = this.buildPromptForMidjourney(text);
+    
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${settings.apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: prompt
+          }]
+        }],
+        generationConfig: {
+          maxOutputTokens: 1000,
+          temperature: 0.7
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => null);
+      if (response.status === 403) {
+        throw new Error('APIキーが無効または認証に失敗しました');
+      } else if (response.status === 429) {
+        throw new Error('API使用制限に達しました。しばらく待ってから再試行してください');
+      } else {
+        throw new Error(`API呼び出しエラー: ${response.status} ${errorData?.error?.message || ''}`);
+      }
+    }
+
+    const data = await response.json();
+    return this.parsePromptResponse(data);
+  }
+
+  buildPromptForMidjourney(text) {
+    const styleInstructions = {
+      none: 'simple, natural translation',
+      detailed: 'highly detailed, photorealistic, cinematic lighting, professional photography, 8K resolution',
+      artistic: 'artistic, abstract, creative composition, fine art, expressive, painterly style',
+      anime: 'anime style, manga style, Japanese animation, cel shading, vibrant colors',
+      photography: 'professional photography, high quality, realistic, DSLR camera, perfect lighting',
+      minimalist: 'minimalist, clean, simple composition, negative space, modern aesthetic'
+    };
+
+    const lengthInstructions = {
+      short: '簡潔で効果的な（15-30語程度）',
+      medium: '適度に詳細な（30-50語程度）',
+      long: '詳細で具体的な（50-80語程度）'
+    };
+
+    // 「なし」スタイルの場合は単純な英訳のみ
+    if (this.promptStyle === 'none') {
+      const basePrompt = `
+以下の日本語テキストを自然な英語に翻訳してください。
+
+入力テキスト: "${text}"
+
+変換の指示:
+1. ${lengthInstructions[this.promptLength]}自然で正確な英訳
+2. 装飾的な表現や技術的な修飾語は使わない
+3. シンプルで分かりやすい英語表現を使用
+
+${this.learningEnabled ? `
+4. 英語学習のため、以下も含めてください:
+   - **重要単語解説**: 使用した重要な英単語の日本語解説
+   - **翻訳のポイント**: 翻訳時の考え方や注意点
+   - **表現のバリエーション**: 他の表現方法の提案
+` : ''}
+
+出力形式:
+**基本プロンプト:**
+[シンプルで自然な英訳]
+
+${this.learningEnabled ? `
+**英語学習:**
+**重要単語解説:**
+- [英単語]: [日本語の意味] - [使用文脈の説明]
+
+**翻訳のポイント:**
+- [ポイント]: [説明]
+
+**表現のバリエーション:**
+- [別の表現]: [使用場面の説明]
+` : ''}
+`;
+      return basePrompt;
+    }
+
+    // その他のスタイルの場合
+    const basePrompt = `
+以下の日本語テキストを英語のMidjourneyプロンプトに変換してください。
+
+入力テキスト: "${text}"
+
+変換の指示:
+1. 基本プロンプト: ${lengthInstructions[this.promptLength]}シンプルで自然な英訳
+2. スタイル: ${styleInstructions[this.promptStyle]}
+3. パラメーターは含めない（WEB UIで設定するため）
+4. クリエイティブ提案: より魅力的で創造的なバリエーション
+
+${this.learningEnabled ? `
+5. 英語学習のため、以下も含めてください:
+   - **重要単語解説**: 使用した重要な英単語の日本語解説
+   - **表現技術**: 効果的な英語表現のコツ
+   - **改善ポイント**: より良い画像を生成するための追加アイデア
+` : ''}
+
+出力形式:
+**基本プロンプト:**
+[シンプルで自然な英訳]
+
+**クリエイティブ提案:**
+[より魅力的で創造的なバリエーション]
+
+${this.learningEnabled ? `
+**英語学習:**
+**重要単語解説:**
+- [英単語]: [日本語の意味] - [使用文脈の説明]
+
+**表現技術:**
+- [技術名]: [効果と使い方の説明]
+
+**改善ポイント:**
+- [具体的な改善アイデア]
+` : ''}
+`;
+
+    return basePrompt;
+  }
+
+  parsePromptResponse(data) {
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('APIからの応答が空です');
+    }
+
+    const content = data.candidates[0].content;
+    if (!content || !content.parts || content.parts.length === 0) {
+      throw new Error('APIからの応答が無効です');
+    }
+
+    const responseText = content.parts[0].text;
+    
+    // 基本プロンプト部分を抽出
+    const basicPromptMatch = responseText.match(/\*\*基本プロンプト:\*\*\s*\n(.*?)(?=\n\*\*|$)/s);
+    const basicPrompt = basicPromptMatch ? basicPromptMatch[1].trim() : responseText.trim();
+
+    // クリエイティブ提案を抽出（「なし」スタイルの場合は空）
+    let creativePrompt = '';
+    if (this.promptStyle !== 'none') {
+      const creativePromptMatch = responseText.match(/\*\*クリエイティブ提案:\*\*\s*\n(.*?)(?=\n\*\*|$)/s);
+      creativePrompt = creativePromptMatch ? creativePromptMatch[1].trim() : '';
+    }
+
+    // 学習コンテンツを抽出（英語学習機能が有効な場合）
+    let learningContent = '';
+    if (this.learningEnabled) {
+      const learningMatch = responseText.match(/\*\*英語学習:\*\*\s*\n(.*?)$/s);
+      learningContent = learningMatch ? learningMatch[1].trim() : '';
+    }
+
+    return {
+      originalText: this.selectedText,
+      basicPrompt: basicPrompt,
+      creativePrompt: creativePrompt,
+      learningContent: learningContent,
+      hasLearning: this.learningEnabled,
+      isSimpleTranslation: this.promptStyle === 'none',
+      responseText: responseText,
+      type: 'prompt_conversion'
+    };
+  }
+
+  showConvertingIndicator() {
+    this.removeExistingIndicators();
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'ai-text-checker-indicator converting';
+    
+    const message = this.promptStyle === 'none' ? '🌍 英語翻訳中...' : '🎨 Midjourneyプロンプトに変換中...';
+    
+    indicator.innerHTML = `
+      <div class="indicator-content">
+        <div class="loading-spinner"></div>
+        <div class="indicator-text">${message}</div>
+      </div>
+    `;
+    
+    document.body.appendChild(indicator);
+    this.positionIndicator(indicator);
+    
+    // 自動削除タイマー
+    setTimeout(() => {
+      indicator.remove();
+    }, 30000);
+  }
+
+  showPromptResult(result) {
+    this.removeExistingIndicators();
+    
+    const indicator = document.createElement('div');
+    indicator.className = 'ai-text-checker-indicator result prompt-result';
+    
+    const learningSection = result.hasLearning && result.learningContent ? `
+      <div class="learning-section">
+        <h4>📚 英語学習</h4>
+        <div class="learning-content">${this.markdownToHtml(result.learningContent)}</div>
+      </div>
+    ` : '';
+
+    // 「なし」スタイルの場合はクリエイティブ提案を表示しない
+    const creativeSection = result.creativePrompt && !result.isSimpleTranslation ? `
+      <div class="creative-section">
+        <h4>✨ クリエイティブ提案</h4>
+        <div class="creative-text">${this.escapeHtml(result.creativePrompt)}</div>
+        <div class="creative-actions">
+          <button class="copy-creative-button" data-text="${this.escapeHtml(result.creativePrompt)}" title="クリエイティブ版をコピー">🎨 こちらをコピー</button>
+        </div>
+      </div>
+    ` : '';
+
+    const titleText = result.isSimpleTranslation ? '🌍 英語翻訳完了' : '🎨 Midjourneyプロンプト変換完了';
+    const promptSectionTitle = result.isSimpleTranslation ? '📝 英語翻訳' : '📝 基本プロンプト';
+
+    indicator.innerHTML = `
+      <div class="indicator-content">
+        <div class="indicator-header">
+          <span class="indicator-title">${titleText}</span>
+          <button class="close-button" title="閉じる">×</button>
+        </div>
+        
+        <div class="prompt-section">
+          <h4>${promptSectionTitle}</h4>
+          <div class="prompt-text">${this.escapeHtml(result.basicPrompt)}</div>
+          <div class="prompt-actions">
+            <button class="copy-button" data-text="${this.escapeHtml(result.basicPrompt)}" title="基本版をコピー">📋 コピー</button>
+            ${!result.isSimpleTranslation ? `<button class="midjourney-button" data-prompt="${this.escapeHtml(result.basicPrompt)}" title="MidjourneyWEBで開く">🎨 MidjourneyWEBで開く</button>` : ''}
+          </div>
+        </div>
+        
+        ${creativeSection}
+        
+        ${learningSection}
+        
+        <div class="original-section">
+          <h4>📄 元のテキスト</h4>
+          <div class="original-text">${this.escapeHtml(result.originalText)}</div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(indicator);
+    this.positionIndicator(indicator);
+    
+    // イベントリスナーを追加
+    this.setupPromptResultListeners(indicator, result);
+  }
+
+  setupPromptResultListeners(indicator, result) {
+    // 閉じるボタン
+    const closeButton = indicator.querySelector('.close-button');
+    closeButton?.addEventListener('click', () => {
+      indicator.remove();
+    });
+
+    // 基本プロンプトのコピーボタン
+    const copyButton = indicator.querySelector('.copy-button');
+    copyButton?.addEventListener('click', async () => {
+      await this.copyToClipboard(result.basicPrompt);
+      copyButton.textContent = '✅ コピー完了';
+      setTimeout(() => {
+        copyButton.textContent = '📋 コピー';
+      }, 2000);
+    });
+
+    // クリエイティブプロンプトのコピーボタン
+    const copyCreativeButton = indicator.querySelector('.copy-creative-button');
+    copyCreativeButton?.addEventListener('click', async () => {
+      await this.copyToClipboard(result.creativePrompt);
+      copyCreativeButton.textContent = '✅ コピー完了';
+      setTimeout(() => {
+        copyCreativeButton.textContent = '🎨 こちらをコピー';
+      }, 2000);
+    });
+
+    // Midjourneyボタン
+    const midjourneyButton = indicator.querySelector('.midjourney-button');
+    midjourneyButton?.addEventListener('click', () => {
+      // MidjourneyのWEB版を開く
+      window.open(`https://www.midjourney.com/imagine`, '_blank');
+      
+      // 基本プロンプトをクリップボードにコピーしておく
+      this.copyToClipboard(result.basicPrompt);
+      
+      midjourneyButton.textContent = '✅ 開いてコピー完了';
+      setTimeout(() => {
+        midjourneyButton.textContent = '🎨 MidjourneyWEBで開く';
+      }, 3000);
+    });
+
+    // ESCキーで閉じる
+    const escHandler = (e) => {
+      if (e.key === 'Escape') {
+        indicator.remove();
+        document.removeEventListener('keydown', escHandler);
+      }
+    };
+    document.addEventListener('keydown', escHandler);
+  }
+
+  // マークダウンをHTMLに変換するヘルパー関数
+  markdownToHtml(markdown) {
+    if (!markdown) return '';
+    
+    let html = markdown
+      // **太字** を <strong> に変換
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      // *斜体* を <em> に変換
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      // - リスト項目を <li> に変換
+      .replace(/^- (.*$)/gm, '<li>$1</li>')
+      // 改行を <br> に変換
+      .replace(/\n/g, '<br>')
+      // 連続する <li> を <ul> で囲む
+      .replace(/(<li>.*<\/li>)/g, '<ul>$1</ul>')
+      // 重複した <ul> タグを整理
+      .replace(/<\/ul><br><ul>/g, '');
+    
+    return html;
   }
 }
 

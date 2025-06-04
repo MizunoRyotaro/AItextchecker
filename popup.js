@@ -1,7 +1,8 @@
-// AI文章チェッカー - ポップアップ設定画面
+// AI文章チェッカー & プロンプト変換 - ポップアップ設定画面
 class SettingsManager {
   constructor() {
     this.elements = {};
+    this.currentMode = 'text-check';
     this.init();
   }
 
@@ -17,18 +18,38 @@ class SettingsManager {
       enabledToggle: document.getElementById('enabledToggle'),
       apiKey: document.getElementById('apiKey'),
       minLength: document.getElementById('minLength'),
+      learningToggle: document.getElementById('learningToggle'),
+      promptStyle: document.getElementById('promptStyle'),
+      promptLength: document.getElementById('promptLength'),
       saveButton: document.getElementById('saveButton'),
       statusMessage: document.getElementById('statusMessage'),
       todayChecks: document.getElementById('todayChecks'),
       totalChecks: document.getElementById('totalChecks'),
-      totalIssues: document.getElementById('totalIssues')
+      totalIssues: document.getElementById('totalIssues'),
+      modeDescription: document.getElementById('modeDescription'),
+      textCheckSettings: document.getElementById('textCheckSettings'),
+      promptSettings: document.getElementById('promptSettings')
     };
   }
 
   setupEventListeners() {
+    // モードタブの切り替え
+    const modeTabs = document.querySelectorAll('.mode-tab');
+    modeTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const mode = tab.getAttribute('data-mode');
+        this.switchMode(mode);
+      });
+    });
+
     // 有効/無効トグル
     this.elements.enabledToggle.addEventListener('click', () => {
       this.elements.enabledToggle.classList.toggle('active');
+    });
+
+    // 英語学習機能トグル
+    this.elements.learningToggle.addEventListener('click', () => {
+      this.elements.learningToggle.classList.toggle('active');
     });
 
     // 保存ボタン
@@ -44,7 +65,7 @@ class SettingsManager {
     });
 
     // 入力フィールドの変更を監視
-    [this.elements.apiKey, this.elements.minLength].forEach(input => {
+    [this.elements.apiKey, this.elements.minLength, this.elements.promptStyle, this.elements.promptLength].forEach(input => {
       input.addEventListener('input', () => {
         this.hideStatusMessage();
       });
@@ -60,16 +81,51 @@ class SettingsManager {
     });
   }
 
+  switchMode(mode) {
+    this.currentMode = mode;
+    
+    // タブの状態を更新
+    document.querySelectorAll('.mode-tab').forEach(tab => {
+      tab.classList.remove('active');
+      if (tab.getAttribute('data-mode') === mode) {
+        tab.classList.add('active');
+      }
+    });
+
+    // 設定パネルの表示切り替え
+    this.elements.textCheckSettings.classList.remove('active');
+    this.elements.promptSettings.classList.remove('active');
+    
+    if (mode === 'text-check') {
+      this.elements.textCheckSettings.classList.add('active');
+      this.elements.modeDescription.textContent = '日本語文章の誤字脱字や表現をAIがチェックします';
+    } else if (mode === 'prompt-convert') {
+      this.elements.promptSettings.classList.add('active');
+      this.elements.modeDescription.textContent = '日本語でイメージを記述し、最新Midjourney（v6.1対応）WEB版用の英語プロンプトに変換します';
+    }
+  }
+
   async loadSettings() {
     try {
-      const settings = await this.getStorageData(['enabled', 'apiKey', 'minLength']);
+      const settings = await this.getStorageData([
+        'enabled', 'apiKey', 'minLength', 'mode', 
+        'learningEnabled', 'promptStyle', 'promptLength'
+      ]);
       
       // デフォルト値の設定
       const defaults = {
         enabled: true,
         apiKey: '',
-        minLength: 20
+        minLength: 20,
+        mode: 'text-check',
+        learningEnabled: true,
+        promptStyle: 'none',
+        promptLength: 'medium'
       };
+
+      // モードを設定
+      const mode = settings.mode || defaults.mode;
+      this.switchMode(mode);
 
       // UIに反映
       const enabled = settings.enabled !== false;
@@ -77,8 +133,15 @@ class SettingsManager {
         this.elements.enabledToggle.classList.add('active');
       }
 
+      const learningEnabled = settings.learningEnabled !== false;
+      if (learningEnabled) {
+        this.elements.learningToggle.classList.add('active');
+      }
+
       this.elements.apiKey.value = settings.apiKey || defaults.apiKey;
       this.elements.minLength.value = settings.minLength || defaults.minLength;
+      this.elements.promptStyle.value = settings.promptStyle || defaults.promptStyle;
+      this.elements.promptLength.value = settings.promptLength || defaults.promptLength;
 
     } catch (error) {
       console.error('設定の読み込みエラー:', error);
@@ -116,7 +179,11 @@ class SettingsManager {
       const settings = {
         enabled: this.elements.enabledToggle.classList.contains('active'),
         apiKey: this.elements.apiKey.value.trim(),
-        minLength: parseInt(this.elements.minLength.value)
+        minLength: parseInt(this.elements.minLength.value),
+        mode: this.currentMode,
+        learningEnabled: this.elements.learningToggle.classList.contains('active'),
+        promptStyle: this.elements.promptStyle.value,
+        promptLength: this.elements.promptLength.value
       };
 
       // バリデーション
@@ -156,7 +223,6 @@ class SettingsManager {
     if (settings.minLength < 10 || settings.minLength > 1000) {
       return { isValid: false, message: '最小チェック文字数は10-1000の範囲で設定してください' };
     }
-
 
     if (settings.enabled && !settings.apiKey) {
       return { isValid: false, message: '機能を有効にするにはAPIキーが必要です' };
@@ -200,8 +266,7 @@ class SettingsManager {
         });
       }
     } catch (error) {
-      // タブにコンテンツスクリプトが読み込まれていない場合は無視
-      console.log('コンテンツスクリプトへの通知をスキップ:', error.message);
+      console.log('Content script notification failed:', error);
     }
   }
 
