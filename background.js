@@ -292,7 +292,6 @@ class BackgroundService {
       enabled: true,
       apiKey: '',
       minLength: 10,
-      checkDelay: 1000,
       todayChecks: 0,
       totalChecks: 0,
       totalIssues: 0,
@@ -324,7 +323,7 @@ class BackgroundService {
           break;
 
         case 'GET_SETTINGS':
-          const settings = await this.getStorageData(['enabled', 'apiKey', 'minLength', 'checkDelay']);
+          const settings = await this.getStorageData(['enabled', 'apiKey', 'minLength']);
           sendResponse({ success: true, data: settings });
           break;
 
@@ -396,7 +395,7 @@ class BackgroundService {
   async handleStorageChange(changes, namespace) {
     if (namespace === 'sync') {
       // 設定変更をコンテンツスクリプトに通知
-      if (changes.enabled || changes.apiKey || changes.minLength || changes.checkDelay) {
+      if (changes.enabled || changes.apiKey || changes.minLength) {
         this.notifyAllTabs('SETTINGS_CHANGED', changes);
         
         // 有効/無効設定が変更された場合はコンテキストメニューを更新

@@ -17,7 +17,6 @@ class SettingsManager {
       enabledToggle: document.getElementById('enabledToggle'),
       apiKey: document.getElementById('apiKey'),
       minLength: document.getElementById('minLength'),
-      checkDelay: document.getElementById('checkDelay'),
       saveButton: document.getElementById('saveButton'),
       statusMessage: document.getElementById('statusMessage'),
       todayChecks: document.getElementById('todayChecks'),
@@ -45,7 +44,7 @@ class SettingsManager {
     });
 
     // 入力フィールドの変更を監視
-    [this.elements.apiKey, this.elements.minLength, this.elements.checkDelay].forEach(input => {
+    [this.elements.apiKey, this.elements.minLength].forEach(input => {
       input.addEventListener('input', () => {
         this.hideStatusMessage();
       });
@@ -63,14 +62,13 @@ class SettingsManager {
 
   async loadSettings() {
     try {
-      const settings = await this.getStorageData(['enabled', 'apiKey', 'minLength', 'checkDelay']);
+      const settings = await this.getStorageData(['enabled', 'apiKey', 'minLength']);
       
       // デフォルト値の設定
       const defaults = {
         enabled: true,
         apiKey: '',
-        minLength: 20,
-        checkDelay: 1000
+        minLength: 20
       };
 
       // UIに反映
@@ -81,7 +79,6 @@ class SettingsManager {
 
       this.elements.apiKey.value = settings.apiKey || defaults.apiKey;
       this.elements.minLength.value = settings.minLength || defaults.minLength;
-      this.elements.checkDelay.value = settings.checkDelay || defaults.checkDelay;
 
     } catch (error) {
       console.error('設定の読み込みエラー:', error);
@@ -119,8 +116,7 @@ class SettingsManager {
       const settings = {
         enabled: this.elements.enabledToggle.classList.contains('active'),
         apiKey: this.elements.apiKey.value.trim(),
-        minLength: parseInt(this.elements.minLength.value),
-        checkDelay: parseInt(this.elements.checkDelay.value)
+        minLength: parseInt(this.elements.minLength.value)
       };
 
       // バリデーション
@@ -161,9 +157,6 @@ class SettingsManager {
       return { isValid: false, message: '最小チェック文字数は10-1000の範囲で設定してください' };
     }
 
-    if (settings.checkDelay < 500 || settings.checkDelay > 5000) {
-      return { isValid: false, message: 'チェック遅延時間は500-5000ミリ秒の範囲で設定してください' };
-    }
 
     if (settings.enabled && !settings.apiKey) {
       return { isValid: false, message: '機能を有効にするにはAPIキーが必要です' };
